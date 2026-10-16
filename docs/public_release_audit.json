@@ -1,0 +1,17 @@
+{
+  "source_history_copied": false,
+  "sample_origin": "Independent deterministic synthetic generator; no source records used",
+  "sample_patients": 72,
+  "sample_scans": 198,
+  "checked_public_files": 31,
+  "checks": {
+    "known_source_patient_identifier_matches": 0,
+    "credential_or_internal_storage_pattern_matches": 0,
+    "raw_images_or_patient_source_tables_tracked": false,
+    "notebook_saved_outputs": false,
+    "weight_assets_match_sha256": true,
+    "ct_checkpoints_contain_only_finite_tensor_parameters": true,
+    "model_has_only_allowlisted_parameters_and_normalizer_breakpoints": true
+  },
+  "weight_note": "Learned numeric parameters include unlinked empirical-CDF breakpoints. They are model parameters, not differentially private."
+}

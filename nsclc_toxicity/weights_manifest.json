@@ -1,0 +1,34 @@
+{
+  "release": "v1.0.0",
+  "repository": "Aneja-Lab-Yale/Aneja-Lab-Public-NSCLC-Toxicity",
+  "assets": [
+    {
+      "name": "dino_fold1.pt",
+      "group": "imaging",
+      "bytes": 88895432,
+      "sha256": "cc3fc7b23fe09331b461492a828b1601bf70b0dab6b1e4d116d2e9eaae09cb2f",
+      "url": "https://github.com/Aneja-Lab-Yale/Aneja-Lab-Public-NSCLC-Toxicity/releases/download/v1.0.0/dino_fold1.pt"
+    },
+    {
+      "name": "dino_fold2.pt",
+      "group": "imaging",
+      "bytes": 88895432,
+      "sha256": "4837fa744dd528ec18f544dde4c74fc88f153e8bc2fd36d0fee7db9388f39824",
+      "url": "https://github.com/Aneja-Lab-Yale/Aneja-Lab-Public-NSCLC-Toxicity/releases/download/v1.0.0/dino_fold2.pt"
+    },
+    {
+      "name": "dino_fold3.pt",
+      "group": "imaging",
+      "bytes": 88895432,
+      "sha256": "325c2145065029d9a4199e5283715a283d9acacd6f9139e2f4ca0a4e9e0a96c9",
+      "url": "https://github.com/Aneja-Lab-Yale/Aneja-Lab-Public-NSCLC-Toxicity/releases/download/v1.0.0/dino_fold3.pt"
+    },
+    {
+      "name": "final_model.json",
+      "group": "core",
+      "bytes": 46512,
+      "sha256": "8d599c4ffa35d0b976d9aeffb0b032c519eb0c858fceb11a627ecd09cdf58877",
+      "url": "https://github.com/Aneja-Lab-Yale/Aneja-Lab-Public-NSCLC-Toxicity/releases/download/v1.0.0/final_model.json"
+    }
+  ]
+}

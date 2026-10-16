@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nsclc-toxicity"
+version = "1.0.0"
+description = "Pulmonary toxicity research models after lung SBRT"
+requires-python = ">=3.9,<3.13"
+license = {text = "MIT (code); DINOv3 weights have a separate license"}
+dependencies = [
+  "numpy==1.26.4", "pandas==2.3.1", "scipy==1.13.1",
+  "scikit-learn==1.6.1", "matplotlib==3.9.4",
+]
+
+[project.optional-dependencies]
+notebook = ["jupyterlab>=4.3,<5", "ipykernel>=6.29,<7"]
+imaging = ["torch==2.5.1", "torchvision==0.20.1", "timm==1.0.27", "nibabel==5.3.2"]
+test = ["pytest==8.4.2"]
+
+[project.scripts]
+nsclc-toxicity = "nsclc_toxicity.__main__:main"
+
+[tool.setuptools]
+packages = ["nsclc_toxicity"]
+
+[tool.setuptools.package-data]
+nsclc_toxicity = ["weights_manifest.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

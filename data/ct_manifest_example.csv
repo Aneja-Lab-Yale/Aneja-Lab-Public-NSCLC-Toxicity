@@ -1,0 +1,3 @@
+patient_id,scan_id,scan_day,is_baseline,clinical_tumor_size_mm,clinical_t_stage_ordinal,clinical_total_dose_reconciled_gy,clinical_lower_lobe_corrected,clinical_histology_adenocarcinoma_corrected,clinical_histology_squamous_corrected,ct_path,mask_dir,treated_lobe,event_days,censor_days,progression_event_by_365d
+SYN001,SYN001_V0,-30,1,24,1,50,1,1,0,ct/SYN001_V0.nii.gz,masks/SYN001_V0,RLL,,400,0
+SYN001,SYN001_V1,100,0,24,1,50,1,1,0,ct/SYN001_V1.nii.gz,,RLL,,400,0

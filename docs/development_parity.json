@@ -1,0 +1,32 @@
+{
+  "comparison": "Portable held-out fold predictions versus locked development artifacts",
+  "patients": 90,
+  "prediction_rows_per_branch": 654,
+  "branches": {
+    "DL": {
+      "rows": 654,
+      "maximum_absolute_difference": 1.1102230246251565e-16
+    },
+    "Q": {
+      "rows": 654,
+      "maximum_absolute_difference": 7.771561172376096e-16
+    },
+    "Clinical": {
+      "rows": 654,
+      "maximum_absolute_difference": 2.7755575615628914e-16
+    },
+    "Imaging": {
+      "rows": 654,
+      "maximum_absolute_difference": 6.106226635438361e-16
+    },
+    "Multimodal": {
+      "rows": 654,
+      "maximum_absolute_difference": 2.498001805406602e-16
+    }
+  },
+  "ct_architecture": {
+    "comparison": "original versus portable CPU forward pass on a seeded artificial volume",
+    "maximum_absolute_logit_difference": 0.0,
+    "strict_checkpoint_load_all_folds": true
+  }
+}
