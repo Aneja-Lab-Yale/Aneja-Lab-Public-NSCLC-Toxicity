@@ -18,11 +18,21 @@ def test_sample_is_exactly_the_independently_generated_example():
 
 
 def test_notebook_contains_no_saved_results():
+    for path in Path("notebooks").glob("*.ipynb"):
+        notebook = json.loads(path.read_text())
+        for cell in notebook["cells"]:
+            if cell["cell_type"] == "code":
+                assert cell["outputs"] == []
+                assert cell["execution_count"] is None
+
+
+def test_primary_notebook_computes_real_images():
     notebook = json.loads(Path("notebooks/quickstart.ipynb").read_text())
-    for cell in notebook["cells"]:
-        if cell["cell_type"] == "code":
-            assert cell["outputs"] == []
-            assert cell["execution_count"] is None
+    source = "\n".join("".join(c["source"]) for c in notebook["cells"] if c["cell_type"] == "code")
+    assert "download_demo(" in source
+    assert "prepare_ct(" in source and "auto_masks=True" in source
+    assert "data/sample.csv" not in source
+    assert "make_sample" not in source
 
 
 def test_download_rejects_corruption_and_preserves_existing_file(tmp_path, monkeypatch):

@@ -7,3 +7,7 @@ The CT networks use Meta's DINOv3 ViT-S/16, through the `timm` implementation. R
 - [timm implementation and model card](https://huggingface.co/timm/vit_small_patch16_dinov3.lvd1689m)
 
 Python dependencies retain their own licenses. No original CT scans, clinical source files, patient identifiers, embeddings, or manuscript patient-level outputs are included in this public repository.
+
+Automatic lung masks use the free `total` task of [TotalSegmentator](https://github.com/wasserth/TotalSegmentator), pinned to package 2.13.0, with [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) 2.7.0. Cite the [TotalSegmentator paper](https://doi.org/10.1148/ryai.230024) and nnU-Net when using these tools. Their code and downloaded weights retain their upstream licenses; they are not redistributed in this Git repository.
+
+The real CT example is downloaded directly from 3D Slicer. Its provenance, checksum, upstream terms, and fictional clinical inputs are documented in [PUBLIC_CT.md](PUBLIC_CT.md). The MIT synthetic-data license does not replace the public image source’s terms.

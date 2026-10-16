@@ -28,7 +28,17 @@ python -m ipykernel install --user --name nsclc_toxicity --display-name "NSCLC T
 
 **CSV error:** compare headers with `data/data_dictionary.csv`. Missing clinical/QCT values are blank cells. CT hazard inputs must be complete probabilities from 0 to 1. Do not use `unknown`, `%`, or units inside numeric cells.
 
-**CT dependencies:** install `python -m pip install -e ".[imaging]"`. CPU works; CT retraining is much faster on a CUDA GPU. The CSV quickstart requires no GPU or PyTorch installation.
+**Raw CT dependencies:** the main `environment.yml` includes them and uses Python 3.11. For an existing Python ≥3.10 environment, install `python -m pip install -e ".[imaging,segmentation,notebook]"`. CPU works; CT retraining is much faster on a CUDA GPU. The prepared synthetic CSV demo needs no PyTorch or segmentation installation.
+
+**CPU-only PyTorch on Linux/Windows:** before installing this package in a Python environment, run:
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install torch==2.5.1+cpu torchvision==0.20.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+python -m pip install -e ".[imaging,segmentation,notebook]"
+```
+
+**Old notebook kernel:** if VS Code selects `nsclc_env` from the private project, switch to the new `nsclc_toxicity` environment. The new environment includes `ipykernel`; select it before running the notebook.
 
 **Verify the installation:**
 

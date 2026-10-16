@@ -9,6 +9,10 @@ from __future__ import annotations
 import json
 import math
 import random
+import hashlib
+import os
+import re
+import tempfile
 from pathlib import Path
 
 import nibabel as nib
@@ -114,26 +118,40 @@ class DinoModel(nn.Module):
         return self.head(self.feature_extractor(x))
 
 
-def preprocess_ct(path: Path) -> np.ndarray:
+def load_ct(path: Path) -> nib.Nifti1Image:
+    """Read HU and match the development cohort's LAS array orientation.
+
+    This flips/permutates voxel axes without interpolation or intensity changes.
+    The neural network and signed axial Sobel feature depend on axis direction.
+    """
     image = nib.load(str(path))
+    if len(image.shape) != 3 or not np.isfinite(image.affine).all() or abs(np.linalg.det(image.affine[:3, :3])) < 1e-8:
+        raise ValueError("CT must have a valid 3D voxel grid and spatial affine.")
+    transform = nib.orientations.ornt_transform(nib.orientations.io_orientation(image.affine),
+                                               nib.orientations.axcodes2ornt(("L", "A", "S")))
+    return image.as_reoriented(transform)
+
+
+def preprocess_ct(path: Path) -> np.ndarray:
+    image = load_ct(path)
     array = image.get_fdata(dtype=np.float32)
     if array.ndim != 3 or not np.isfinite(array).all():
         raise ValueError("CT must be a finite 3D NIfTI volume in Hounsfield units.")
-    if nib.aff2axcodes(image.affine)[2] not in ("S", "I"):
-        raise ValueError("The NIfTI third axis must represent axial slices.")
     array = (np.clip(array, -1000, 400) + 1000) / 1400
     array = array.transpose(2, 1, 0)
     return zoom(array, [s / n for s, n in zip((48, 96, 96), array.shape)], order=1).astype(np.float32)
 
 
 def qct_features(path: Path, mask_dir: Path, treated_lobe: str) -> dict:
-    image = nib.load(str(path))
+    image = load_ct(path)
     array = image.get_fdata(dtype=np.float32)
     if array.ndim != 3 or not np.isfinite(array).all():
         raise ValueError("QCT requires a finite 3D CT volume.")
     masks = {}
     for lobe, filename in LOBES.items():
         mask = nib.load(str(mask_dir / f"{filename}.nii.gz"))
+        mask = mask.as_reoriented(nib.orientations.ornt_transform(
+            nib.orientations.io_orientation(mask.affine), nib.orientations.axcodes2ornt(("L", "A", "S"))))
         if mask.shape != image.shape or not np.allclose(mask.affine, image.affine, atol=1e-3, rtol=0):
             raise ValueError("All five lobe masks must match the exact CT voxel grid and affine.")
         mask_array = mask.get_fdata(dtype=np.float32)
@@ -168,14 +186,144 @@ def qct_features(path: Path, mask_dir: Path, treated_lobe: str) -> dict:
     return result
 
 
-def read_manifest(path: Path) -> pd.DataFrame:
+def convert_ct(source: Path, destination: Path) -> Path:
+    """Accept HU NIfTI/NRRD/MHA or a directory containing one DICOM CT series."""
+    if source.is_file() and source.name.lower().endswith((".nii", ".nii.gz")):
+        return source
+    if not source.exists():
+        raise ValueError(f"CT input does not exist: {source}")
+    try:
+        import SimpleITK as sitk
+    except ImportError as exc:
+        raise ValueError('NRRD/DICOM conversion needs: python -m pip install -e ".[segmentation]"') from exc
+    if source.is_dir():
+        series = sitk.ImageSeriesReader.GetGDCMSeriesIDs(str(source))
+        if not series or len(series) != 1:
+            raise ValueError("Place exactly one CT DICOM series in each input directory; separate localizers and other series first.")
+        files = sitk.ImageSeriesReader.GetGDCMSeriesFileNames(str(source), series[0])
+        reader = sitk.ImageSeriesReader()
+        reader.SetFileNames(files)
+        reader.MetaDataDictionaryArrayUpdateOn()
+        image = reader.Execute()
+        if reader.HasMetaDataKey(0, "0008|0060") and reader.GetMetaData(0, "0008|0060").strip() != "CT":
+            raise ValueError("The input DICOM series must have CT modality.")
+    else:
+        image = sitk.ReadImage(str(source))
+    if image.GetDimension() != 3 or image.GetNumberOfComponentsPerPixel() != 1:
+        raise ValueError("CT input must be a scalar 3D volume, in Hounsfield units.")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    # SimpleITK applies DICOM rescale slope/intercept when reading; no windowing here.
+    # Publish the converted file only when complete. A notebook and a command
+    # may read the same demo folder at once; neither should see truncated gzip.
+    with tempfile.TemporaryDirectory(prefix=".conversion-", dir=destination.parent) as temporary:
+        pending = Path(temporary) / destination.name
+        sitk.WriteImage(image, str(pending))
+        os.replace(pending, destination)
+    return destination
+
+
+def clinical_features(frame: pd.DataFrame) -> pd.DataFrame:
+    """Translate a short physician-facing manifest into the six model inputs."""
+    frame = frame.copy()
+    lobe = frame["treated_lobe"].fillna("").astype(str).str.strip().str.upper()
+    if not lobe.isin(["", *LOBES]).all():
+        raise ValueError("treated_lobe must be RUL, RML, RLL, LUL, LLL, or blank.")
+    if not set(C_FEATURES).issubset(frame):
+        require_columns(frame, ["tumor_size_mm", "t_stage", "total_dose_gy", "histology"])
+        frame[C_FEATURES[0]] = pd.to_numeric(frame["tumor_size_mm"], errors="raise")
+        frame[C_FEATURES[2]] = pd.to_numeric(frame["total_dose_gy"], errors="raise")
+        def stage(value):
+            if pd.isna(value) or not str(value).strip():
+                return np.nan
+            text = str(value).strip().upper()
+            if re.fullmatch(r"[0-4]\.0", text):
+                return float(text)
+            match = re.fullmatch(r"[CPRY]*T?([0-4])[ABC]?", text)
+            if not match:
+                raise ValueError("t_stage must be 0–4 or a T stage such as T1a; leave unknown values blank.")
+            return float(match.group(1))
+        frame[C_FEATURES[1]] = frame["t_stage"].map(stage)
+        frame[C_FEATURES[3]] = np.where(lobe.eq(""), np.nan, lobe.isin(["RLL", "LLL"]).astype(float))
+        histology = frame["histology"].fillna("").astype(str).str.lower().str.strip()
+        unknown = histology.isin(["", "unknown", "not known"])
+        frame[C_FEATURES[4]] = np.where(unknown, np.nan, histology.str.contains("adeno", regex=False).astype(float))
+        frame[C_FEATURES[5]] = np.where(unknown, np.nan, histology.str.contains(r"squamous|\bscc\b|sqcc", regex=True).astype(float))
+    known = lobe.ne("") & frame[C_FEATURES[3]].notna()
+    if frame.loc[known, C_FEATURES[3]].astype(float).ne(lobe.loc[known].isin(["RLL", "LLL"]).astype(float)).any():
+        raise ValueError("The lower-lobe clinical indicator disagrees with treated_lobe.")
+    frame["treated_lobe"] = lobe
+    return frame
+
+
+def segment_lobes(ct_path: Path, output: Path, *, device: str = "cpu", fast: bool = True,
+                  cache: Path | None = None) -> Path:
+    """Generate five real lobe masks, reuse only a matching completed run."""
+    from .download import sha256
+    output.mkdir(parents=True, exist_ok=True)
+    cache = cache or Path("weights/totalsegmentator")
+    cache.mkdir(parents=True, exist_ok=True)
+    # Keep weights/config inside the project rather than writing to a user's home.
+    os.environ["TOTALSEG_HOME_DIR"] = str(cache.resolve())
+    expected = {"ct_sha256": sha256(ct_path), "task": "total", "fast": fast,
+                "rois": list(LOBES.values()), "TotalSegmentator": "2.13.0"}
+    record = output / "segmentation.json"
+    if record.is_file() and json.loads(record.read_text()) == expected and all((output / f"{lobe}.nii.gz").is_file() for lobe in LOBES.values()):
+        return output
+    try:
+        from importlib.metadata import version
+        from totalsegmentator.python_api import totalsegmentator
+    except ImportError as exc:
+        raise ValueError('Automatic masks need Python >=3.10 and: python -m pip install -e ".[imaging,segmentation]"') from exc
+    if version("TotalSegmentator") != expected["TotalSegmentator"]:
+        raise ValueError('Install the tested segmentation version: python -m pip install -e ".[segmentation]"')
+    # The total task is open and needs no paid license; do not send usage telemetry.
+    config = cache / "config.json"
+    if config.is_file():
+        settings = json.loads(config.read_text())
+    else:
+        settings = {"totalseg_id": "nsclc-local", "prediction_counter": 0}
+    settings["send_usage_stats"] = False
+    config.write_text(json.dumps(settings, indent=2) + "\n")
+    print(f"Segmenting lung lobes ({'3 mm' if fast else '1.5 mm'}, {device})...", flush=True)
+    totalsegmentator(ct_path, output, task="total", fast=fast, roi_subset=list(LOBES.values()),
+                    device="cpu" if device == "cpu" else "gpu", nr_thr_resamp=1, nr_thr_saving=1,
+                    quiet=False, statistics=False)
+    # Geometry, finite values, and all five nonempty masks are checked before use.
+    qct_features(ct_path, output, "RUL")
+    record.write_text(json.dumps(expected, indent=2) + "\n")
+    return output
+
+
+def read_manifest(path: Path, *, auto_masks: bool = False, mask_output: Path | None = None,
+                  device: str = "cpu", fast: bool = True, cache: Path | None = None) -> pd.DataFrame:
     frame = pd.read_csv(path)
-    require_columns(frame, [*IDENTITY, *C_FEATURES, "ct_path", "mask_dir", "treated_lobe"])
+    require_columns(frame, [*IDENTITY, "ct_path", "treated_lobe"])
+    frame = clinical_features(frame)
+    frame = validate(frame.assign(**{col: np.nan for col in Q_FEATURES}), dl=False)
+    if "mask_dir" not in frame:
+        frame["mask_dir"] = ""
+    frame["mask_dir"] = frame["mask_dir"].fillna("")
     for col in ("ct_path", "mask_dir"):
-        frame[col] = frame[col].map(lambda v: str((path.parent / str(v)).resolve()) if not Path(str(v)).is_absolute() else str(v))
+        frame[col] = frame[col].map(lambda v: str((path.parent / str(v)).resolve()) if str(v) and not Path(str(v)).is_absolute() else str(v))
+    converted = {}
+    for source in frame["ct_path"].unique():
+        key = hashlib.sha256(source.encode()).hexdigest()[:16]
+        converted[source] = str(convert_ct(Path(source), (mask_output or Path("results/lobe_masks")).parent / "converted_ct" / f"{key}.nii.gz"))
+    frame["ct_path"] = frame["ct_path"].map(converted)
     feature_rows = []
     for _, row in frame.loc[frame["is_baseline"].eq(1)].iterrows():
-        feature_rows.append({"patient_id": row["patient_id"], **qct_features(Path(row["ct_path"]), Path(row["mask_dir"]), str(row["treated_lobe"]).strip().upper())})
+        mask_dir = Path(row["mask_dir"]) if row["mask_dir"] else None
+        if auto_masks:
+            # Hash-based folder names avoid putting patient identifiers into paths.
+            key = hashlib.sha256(str(row["ct_path"]).encode()).hexdigest()[:16]
+            mask_dir = segment_lobes(Path(row["ct_path"]), (mask_output or Path("results/lobe_masks")) / key,
+                                     device=device, fast=fast, cache=cache)
+        if mask_dir is None:
+            raise ValueError("Supply baseline mask_dir or add --auto-masks to generate lung lobes from the CT.")
+        lobe = str(row["treated_lobe"]).strip().upper() if pd.notna(row["treated_lobe"]) else ""
+        if lobe and lobe not in LOBES:
+            raise ValueError("treated_lobe must be RUL, RML, RLL, LUL, LLL, or blank; do not infer tumor location from the lobe masks.")
+        feature_rows.append({"patient_id": row["patient_id"], **qct_features(Path(row["ct_path"]), mask_dir, lobe)})
     features = pd.DataFrame(feature_rows)
     if features.empty:
         raise ValueError("The CT manifest needs one baseline per patient.")
@@ -196,8 +344,10 @@ def volume_tensor(frame: pd.DataFrame) -> torch.Tensor:
     return torch.from_numpy(np.stack([preprocess_ct(Path(path)) for path in frame["ct_path"]]))[:, None]
 
 
-def prepare_ct(manifest: Path, weights: Path, output: Path, device: str = "cpu") -> None:
-    frame = read_manifest(manifest)
+def prepare_ct(manifest: Path, weights: Path, output: Path, device: str = "cpu", *, auto_masks: bool = False,
+               fast: bool = True) -> None:
+    frame = read_manifest(manifest, auto_masks=auto_masks, mask_output=output.parent / "lobe_masks",
+                          device=device, fast=fast, cache=weights / "totalsegmentator")
     volumes = volume_tensor(frame)
     for fold in FOLDS:
         checkpoint = weights / f"dino_fold{fold}.pt"
@@ -215,9 +365,32 @@ def prepare_ct(manifest: Path, weights: Path, output: Path, device: str = "cpu")
     print(f"Prepared {len(frame)} scans: {output}")
 
 
-def train_ct(manifest: Path, output: Path, device: str = "cpu", seed: int = 20260714, initial_backbone: Path | None = None) -> None:
+def infer_ct(manifest: Path, weights: Path, output: Path, device: str = "cpu", *, fast: bool = True) -> pd.DataFrame:
+    """Run raw CT -> lobes -> Q7/DINOv3 -> final three-fold ensemble."""
+    from .download import download_weights
+    from .model import load_model, predict
+    download_weights(weights, imaging=True)
+    output.mkdir(parents=True, exist_ok=True)
+    prepare_ct(manifest, weights, output / "prepared.csv", device, auto_masks=True, fast=fast)
+    result = predict(pd.read_csv(output / "prepared.csv"), load_model(weights / "final_model.json"))
+    result.to_csv(output / "predictions.csv", index=False)
+    # This is run provenance, not a clinical validation claim.
+    from . import __version__
+    (output / "run.json").write_text(json.dumps({
+        "package_version": __version__, "input_kind": "raw CT and clinical manifest",
+        "orientation": "LAS (matches development)", "segmentation": {"package": "TotalSegmentator 2.13.0", "task": "total", "resolution_mm": 3.0 if fast else 1.5},
+        "computed": {"qct_features": 7, "ct_networks": 3, "hazards_per_network": 4},
+        "prepared_input": "prepared.csv", "predictions": "predictions.csv",
+        "rows": len(result), "score_kind": "uncalibrated research score"}, indent=2) + "\n")
+    print(f"Final ensemble predictions: {output / 'predictions.csv'}")
+    return result
+
+
+def train_ct(manifest: Path, output: Path, device: str = "cpu", seed: int = 20260714, initial_backbone: Path | None = None,
+             *, auto_masks: bool = False, fast: bool = True) -> None:
     from .training import assign_folds, run_experiment
-    frame = assign_folds(eligible_cohort(validate(read_manifest(manifest), outcomes=True, dl=False)))
+    frame = assign_folds(eligible_cohort(validate(read_manifest(manifest, auto_masks=auto_masks,
+        mask_output=output / "lobe_masks", device=device, fast=fast, cache=output / "totalsegmentator"), outcomes=True, dl=False)))
     volumes = volume_tensor(frame)
     output.mkdir(parents=True, exist_ok=True)
     for fold in FOLDS:

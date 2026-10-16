@@ -11,3 +11,5 @@ python -m nsclc_toxicity.synthetic
 ```
 
 `ct_manifest_example.csv` is a template with invented IDs and nonexistent image paths. Real CTs and patient data belong in the ignored `private_data/` folder. Generated predictions and fitted models belong in the ignored `results/` folder.
+
+For **real imaging**, run `python -m nsclc_toxicity download-demo-ct`. This fetches a checksum-pinned public 3D Slicer chest CT into the ignored `data/public_ct/` folder and writes a clinical CSV with explicitly fictional clinical values. The primary notebook computes its image features and network outputs from scratch. See [public CT provenance](../docs/PUBLIC_CT.md). `clinical_manifest_example.csv` is the simpler raw-image template for your own data.

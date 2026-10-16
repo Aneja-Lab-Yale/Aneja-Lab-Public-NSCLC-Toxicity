@@ -17,6 +17,7 @@ data/*
 !data/sample.csv
 !data/data_dictionary.csv
 !data/ct_manifest_example.csv
+!data/clinical_manifest_example.csv
 !data/README.md
 *.pt
 *.pth

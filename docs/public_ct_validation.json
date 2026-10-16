@@ -1,0 +1,86 @@
+{
+  "purpose": "Actual end-to-end software run on a real public CT. Not clinical validation.",
+  "public_ct": {
+    "name": "3D Slicer CTChest",
+    "source": "https://github.com/Slicer/Slicer/blob/9ae94df99124986e65094520d5631baef32314e3/Modules/Scripted/SampleData/SampleData.py",
+    "download_url": "https://github.com/Slicer/SlicerTestingData/releases/download/SHA256/4507b664690840abb6cb9af2d919377ffc4ef75b167cb6fd0f747befdb12e38e",
+    "sha256": "4507b664690840abb6cb9af2d919377ffc4ef75b167cb6fd0f747befdb12e38e",
+    "voxel_shape": [
+      512,
+      512,
+      139
+    ],
+    "voxel_spacing_mm": [
+      0.7617189884185791,
+      0.7617189884185791,
+      2.5
+    ],
+    "model_array_orientation": "LAS"
+  },
+  "clinical_inputs": {
+    "fictional": true,
+    "scan_day": -30,
+    "tumor_size_mm": 24,
+    "t_stage": "T1c",
+    "total_dose_gy": 50,
+    "treated_lobe": "RLL",
+    "histology": "adenocarcinoma"
+  },
+  "computed_from_real_images": {
+    "mask_voxels": {
+      "lung_upper_lobe_right": 968916,
+      "lung_middle_lobe_right": 344472,
+      "lung_lower_lobe_right": 904708,
+      "lung_upper_lobe_left": 1002932,
+      "lung_lower_lobe_left": 1140092
+    },
+    "qct": {
+      "lung_volume_ml": 6325.97721206665,
+      "lung_mean": -818.1795654296875,
+      "lung_density_frac_lt_m950_nonoverlap": 0.0005803555050078,
+      "lung_density_frac_m700_to_m300_nonoverlap": 0.0755104193418204,
+      "target_minus_other_p95_hu": 234.0,
+      "target_minus_other_frac_ge_m300": 0.0251646220569567,
+      "target_minus_other_signed_all_slice_2d_sobel_mean": -53.52587690859757
+    },
+    "dl_hazards": {
+      "dl_fold1_hazard_90d": 0.01959826,
+      "dl_fold1_hazard_183d": 0.053650446,
+      "dl_fold1_hazard_274d": 0.003292211,
+      "dl_fold1_hazard_365d": 0.04921438,
+      "dl_fold2_hazard_90d": 0.018605595,
+      "dl_fold2_hazard_183d": 0.0314576,
+      "dl_fold2_hazard_274d": 0.03235547,
+      "dl_fold2_hazard_365d": 0.0668325,
+      "dl_fold3_hazard_90d": 0.019341897,
+      "dl_fold3_hazard_183d": 0.058029257,
+      "dl_fold3_hazard_274d": 0.03338483,
+      "dl_fold3_hazard_365d": 0.07395369
+    },
+    "final_ensemble_scores": {
+      "90": 0.4040321538959594,
+      "183": 0.6755094558861144,
+      "274": 0.7821776887667288,
+      "365": 0.8789744303713225
+    }
+  },
+  "configuration": {
+    "device": "cpu",
+    "segmentation_resolution_mm": 3,
+    "networks": 3,
+    "features_from_synthetic_csv": false
+  },
+  "versions": {
+    "nsclc-toxicity": "1.1.0",
+    "TotalSegmentator": "2.13.0",
+    "nnunetv2": "2.7.0",
+    "torch": "2.5.1+cpu",
+    "torchvision": "0.20.1+cpu",
+    "timm": "1.0.27",
+    "nibabel": "5.3.2",
+    "SimpleITK": "2.5.6",
+    "numpy": "1.26.4",
+    "scipy": "1.13.1",
+    "scikit-learn": "1.6.1"
+  }
+}

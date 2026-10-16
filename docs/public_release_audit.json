@@ -3,7 +3,7 @@
   "sample_origin": "Independent deterministic synthetic generator; no source records used",
   "sample_patients": 72,
   "sample_scans": 198,
-  "checked_public_files": 31,
+  "checked_public_files": 37,
   "checks": {
     "known_source_patient_identifier_matches": 0,
     "credential_or_internal_storage_pattern_matches": 0,

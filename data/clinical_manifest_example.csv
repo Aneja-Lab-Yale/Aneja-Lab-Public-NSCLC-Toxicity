@@ -1,0 +1,2 @@
+patient_id,scan_id,scan_day,is_baseline,ct_path,tumor_size_mm,t_stage,total_dose_gy,treated_lobe,histology
+EXAMPLE001,EXAMPLE001_BASELINE,-30,1,ct/baseline.nii.gz,24,T1c,50,RLL,adenocarcinoma
