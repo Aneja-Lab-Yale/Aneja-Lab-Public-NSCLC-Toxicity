@@ -21,7 +21,8 @@ def main() -> None:
     raw.add_argument("--weights", type=Path, default=Path("weights"))
     raw.add_argument("--output", type=Path, default=Path("results/ct_inference"))
     raw.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
-    raw.add_argument("--full-resolution", action="store_true", help="Use 1.5 mm segmentation instead of the faster 3 mm default")
+    raw.add_argument("--segmentation-resolution", type=float, choices=[6, 3, 1.5], default=6, help="Lobe-model resolution in mm; default 6 matches development")
+    raw.add_argument("--full-resolution", action="store_true", help="Use 1.5 mm instead of the development protocol’s 6 mm segmentation")
     predict = sub.add_parser("predict", help="Run the released ensemble on a prepared CSV")
     predict.add_argument("--input", type=Path, required=True)
     predict.add_argument("--weights", type=Path, default=Path("weights/final_model.json"))
@@ -36,7 +37,8 @@ def main() -> None:
     prepare.add_argument("--output", type=Path, default=Path("results/prepared.csv"))
     prepare.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
     prepare.add_argument("--auto-masks", action="store_true", help="Generate lung lobes from each baseline CT")
-    prepare.add_argument("--full-resolution", action="store_true", help="Use 1.5 mm instead of 3 mm automatic segmentation")
+    prepare.add_argument("--segmentation-resolution", type=float, choices=[6, 3, 1.5], default=6, help="Lobe-model resolution in mm; default 6 matches development")
+    prepare.add_argument("--full-resolution", action="store_true", help="Use 1.5 mm instead of 6 mm automatic segmentation")
     train = sub.add_parser("train-ct", help="Retrain DINOv3 within each patient fold on your CT dataset")
     train.add_argument("--manifest", type=Path, required=True)
     train.add_argument("--output", type=Path, default=Path("results/ct_training"))
@@ -44,7 +46,8 @@ def main() -> None:
     train.add_argument("--seed", type=int, default=20260714)
     train.add_argument("--initial-backbone", type=Path, help="Optional local timm DINOv3 pretrained state")
     train.add_argument("--auto-masks", action="store_true", help="Generate baseline lung lobes before retraining")
-    train.add_argument("--full-resolution", action="store_true", help="Use 1.5 mm instead of 3 mm automatic segmentation")
+    train.add_argument("--segmentation-resolution", type=float, choices=[6, 3, 1.5], default=6, help="Lobe-model resolution in mm; default 6 matches development")
+    train.add_argument("--full-resolution", action="store_true", help="Use 1.5 mm instead of 6 mm automatic segmentation")
     args = parser.parse_args()
     try:
         if args.command == "download-weights":
@@ -55,7 +58,7 @@ def main() -> None:
             download_demo(args.output)
         elif args.command == "infer-ct":
             from .imaging import infer_ct
-            infer_ct(args.manifest, args.weights, args.output, args.device, fast=not args.full_resolution)
+            infer_ct(args.manifest, args.weights, args.output, args.device, resolution=1.5 if args.full_resolution else args.segmentation_resolution)
         elif args.command == "predict":
             from .model import load_model, predict
             result = predict(pd.read_csv(args.input), load_model(args.weights))
@@ -68,11 +71,11 @@ def main() -> None:
             print(f"Completed: {report['patients']} patients, {report['scans']} scans. Results: {args.output}")
         elif args.command == "prepare-ct":
             from .imaging import prepare_ct
-            prepare_ct(args.manifest, args.weights, args.output, args.device, auto_masks=args.auto_masks, fast=not args.full_resolution)
+            prepare_ct(args.manifest, args.weights, args.output, args.device, auto_masks=args.auto_masks, resolution=1.5 if args.full_resolution else args.segmentation_resolution)
         elif args.command == "train-ct":
             from .imaging import train_ct
             train_ct(args.manifest, args.output, args.device, args.seed, args.initial_backbone,
-                     auto_masks=args.auto_masks, fast=not args.full_resolution)
+                     auto_masks=args.auto_masks, resolution=1.5 if args.full_resolution else args.segmentation_resolution)
     except (ValueError, OSError, ImportError) as exc:
         parser.exit(2, f"Error: {exc}\n")
 

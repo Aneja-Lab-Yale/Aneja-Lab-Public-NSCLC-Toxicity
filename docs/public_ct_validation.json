@@ -28,20 +28,20 @@
   },
   "computed_from_real_images": {
     "mask_voxels": {
-      "lung_upper_lobe_right": 968916,
-      "lung_middle_lobe_right": 344472,
-      "lung_lower_lobe_right": 904708,
-      "lung_upper_lobe_left": 1002932,
-      "lung_lower_lobe_left": 1140092
+      "lung_upper_lobe_right": 943889,
+      "lung_middle_lobe_right": 362605,
+      "lung_lower_lobe_right": 919935,
+      "lung_upper_lobe_left": 1022072,
+      "lung_lower_lobe_left": 1148043
     },
     "qct": {
-      "lung_volume_ml": 6325.97721206665,
-      "lung_mean": -818.1795654296875,
-      "lung_density_frac_lt_m950_nonoverlap": 0.0005803555050078,
-      "lung_density_frac_m700_to_m300_nonoverlap": 0.0755104193418204,
-      "target_minus_other_p95_hu": 234.0,
-      "target_minus_other_frac_ge_m300": 0.0251646220569567,
-      "target_minus_other_signed_all_slice_2d_sobel_mean": -53.52587690859757
+      "lung_volume_ml": 6377.361126464843,
+      "lung_mean": -801.8861083984375,
+      "lung_density_frac_lt_m950_nonoverlap": 0.0005956951642017,
+      "lung_density_frac_m700_to_m300_nonoverlap": 0.074315644287877,
+      "target_minus_other_p95_hu": 200.0,
+      "target_minus_other_frac_ge_m300": 0.0228977924230407,
+      "target_minus_other_signed_all_slice_2d_sobel_mean": -70.00795011001415
     },
     "dl_hazards": {
       "dl_fold1_hazard_90d": 0.01959826,
@@ -58,15 +58,15 @@
       "dl_fold3_hazard_365d": 0.07395369
     },
     "final_ensemble_scores": {
-      "90": 0.4040321538959594,
-      "183": 0.6755094558861144,
-      "274": 0.7821776887667288,
-      "365": 0.8789744303713225
+      "90": 0.4215468824379176,
+      "183": 0.6873258734008246,
+      "274": 0.7857404746904213,
+      "365": 0.8808547262925849
     }
   },
   "configuration": {
     "device": "cpu",
-    "segmentation_resolution_mm": 3,
+    "segmentation_resolution_mm": 6,
     "networks": 3,
     "features_from_synthetic_csv": false
   },

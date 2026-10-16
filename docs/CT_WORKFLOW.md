@@ -16,7 +16,7 @@ python -m nsclc_toxicity infer-ct --manifest private_data/clinical.csv --output 
 
 This automatically downloads verified prediction weights, reads/converts the CT, creates all five baseline lobe masks with the free TotalSegmentator `total` task, measures Q7, computes all 12 DINOv3 hazard outputs, and runs the final three-fold ensemble. It saves `prepared.csv`, `predictions.csv`, and `run.json`. Images, masks, model weights, and clinical data stay local; only downloads require internet. Segmentation usage reporting is disabled by this wrapper.
 
-The default segmentation uses 3 mm resolution, then returns masks to the exact input CT grid. Add `--full-resolution` to use the slower 1.5 mm model, or `--device cuda` for a CUDA GPU. Mask resolution affects measured features; review masks and use a consistent, validated segmentation protocol for a study. This preprocessing does not determine tumor location, prescribe treatment, or validate a CT's clinical suitability.
+The default segmentation uses the development protocol’s 6 mm (`fastest`) resolution, then returns masks to the exact input CT grid. Add `--segmentation-resolution 3` for 3 mm or `--full-resolution` for the slower 1.5 mm model, or `--device cuda` for a CUDA GPU. Mask resolution affects measured features; review masks and use a consistent, validated segmentation protocol for a study. This preprocessing does not determine tumor location, prescribe treatment, or validate a CT's clinical suitability.
 
 ## Image formats and orientation
 

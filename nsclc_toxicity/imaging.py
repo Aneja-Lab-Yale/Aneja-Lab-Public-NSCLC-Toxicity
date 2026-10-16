@@ -255,7 +255,7 @@ def clinical_features(frame: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
-def segment_lobes(ct_path: Path, output: Path, *, device: str = "cpu", fast: bool = True,
+def segment_lobes(ct_path: Path, output: Path, *, device: str = "cpu", resolution: float = 6.0,
                   cache: Path | None = None) -> Path:
     """Generate five real lobe masks, reuse only a matching completed run."""
     from .download import sha256
@@ -264,7 +264,9 @@ def segment_lobes(ct_path: Path, output: Path, *, device: str = "cpu", fast: boo
     cache.mkdir(parents=True, exist_ok=True)
     # Keep weights/config inside the project rather than writing to a user's home.
     os.environ["TOTALSEG_HOME_DIR"] = str(cache.resolve())
-    expected = {"ct_sha256": sha256(ct_path), "task": "total", "fast": fast,
+    if resolution not in (6, 3, 1.5):
+        raise ValueError("Segmentation resolution must be 6, 3, or 1.5 mm.")
+    expected = {"ct_sha256": sha256(ct_path), "task": "total", "resolution_mm": resolution,
                 "rois": list(LOBES.values()), "TotalSegmentator": "2.13.0"}
     record = output / "segmentation.json"
     if record.is_file() and json.loads(record.read_text()) == expected and all((output / f"{lobe}.nii.gz").is_file() for lobe in LOBES.values()):
@@ -284,8 +286,8 @@ def segment_lobes(ct_path: Path, output: Path, *, device: str = "cpu", fast: boo
         settings = {"totalseg_id": "nsclc-local", "prediction_counter": 0}
     settings["send_usage_stats"] = False
     config.write_text(json.dumps(settings, indent=2) + "\n")
-    print(f"Segmenting lung lobes ({'3 mm' if fast else '1.5 mm'}, {device})...", flush=True)
-    totalsegmentator(ct_path, output, task="total", fast=fast, roi_subset=list(LOBES.values()),
+    print(f"Segmenting lung lobes ({resolution:g} mm, {device})...", flush=True)
+    totalsegmentator(ct_path, output, task="total", fast=resolution == 3, fastest=resolution == 6, roi_subset=list(LOBES.values()),
                     device="cpu" if device == "cpu" else "gpu", nr_thr_resamp=1, nr_thr_saving=1,
                     quiet=False, statistics=False)
     # Geometry, finite values, and all five nonempty masks are checked before use.
@@ -295,7 +297,7 @@ def segment_lobes(ct_path: Path, output: Path, *, device: str = "cpu", fast: boo
 
 
 def read_manifest(path: Path, *, auto_masks: bool = False, mask_output: Path | None = None,
-                  device: str = "cpu", fast: bool = True, cache: Path | None = None) -> pd.DataFrame:
+                  device: str = "cpu", resolution: float = 6.0, cache: Path | None = None) -> pd.DataFrame:
     frame = pd.read_csv(path)
     require_columns(frame, [*IDENTITY, "ct_path", "treated_lobe"])
     frame = clinical_features(frame)
@@ -317,7 +319,7 @@ def read_manifest(path: Path, *, auto_masks: bool = False, mask_output: Path | N
             # Hash-based folder names avoid putting patient identifiers into paths.
             key = hashlib.sha256(str(row["ct_path"]).encode()).hexdigest()[:16]
             mask_dir = segment_lobes(Path(row["ct_path"]), (mask_output or Path("results/lobe_masks")) / key,
-                                     device=device, fast=fast, cache=cache)
+                                     device=device, resolution=resolution, cache=cache)
         if mask_dir is None:
             raise ValueError("Supply baseline mask_dir or add --auto-masks to generate lung lobes from the CT.")
         lobe = str(row["treated_lobe"]).strip().upper() if pd.notna(row["treated_lobe"]) else ""
@@ -345,9 +347,9 @@ def volume_tensor(frame: pd.DataFrame) -> torch.Tensor:
 
 
 def prepare_ct(manifest: Path, weights: Path, output: Path, device: str = "cpu", *, auto_masks: bool = False,
-               fast: bool = True) -> None:
+               resolution: float = 6.0) -> None:
     frame = read_manifest(manifest, auto_masks=auto_masks, mask_output=output.parent / "lobe_masks",
-                          device=device, fast=fast, cache=weights / "totalsegmentator")
+                          device=device, resolution=resolution, cache=weights / "totalsegmentator")
     volumes = volume_tensor(frame)
     for fold in FOLDS:
         checkpoint = weights / f"dino_fold{fold}.pt"
@@ -365,20 +367,20 @@ def prepare_ct(manifest: Path, weights: Path, output: Path, device: str = "cpu",
     print(f"Prepared {len(frame)} scans: {output}")
 
 
-def infer_ct(manifest: Path, weights: Path, output: Path, device: str = "cpu", *, fast: bool = True) -> pd.DataFrame:
+def infer_ct(manifest: Path, weights: Path, output: Path, device: str = "cpu", *, resolution: float = 6.0) -> pd.DataFrame:
     """Run raw CT -> lobes -> Q7/DINOv3 -> final three-fold ensemble."""
     from .download import download_weights
     from .model import load_model, predict
     download_weights(weights, imaging=True)
     output.mkdir(parents=True, exist_ok=True)
-    prepare_ct(manifest, weights, output / "prepared.csv", device, auto_masks=True, fast=fast)
+    prepare_ct(manifest, weights, output / "prepared.csv", device, auto_masks=True, resolution=resolution)
     result = predict(pd.read_csv(output / "prepared.csv"), load_model(weights / "final_model.json"))
     result.to_csv(output / "predictions.csv", index=False)
     # This is run provenance, not a clinical validation claim.
     from . import __version__
     (output / "run.json").write_text(json.dumps({
         "package_version": __version__, "input_kind": "raw CT and clinical manifest",
-        "orientation": "LAS (matches development)", "segmentation": {"package": "TotalSegmentator 2.13.0", "task": "total", "resolution_mm": 3.0 if fast else 1.5},
+        "orientation": "LAS (matches development)", "segmentation": {"package": "TotalSegmentator 2.13.0", "task": "total", "resolution_mm": resolution},
         "computed": {"qct_features": 7, "ct_networks": 3, "hazards_per_network": 4},
         "prepared_input": "prepared.csv", "predictions": "predictions.csv",
         "rows": len(result), "score_kind": "uncalibrated research score"}, indent=2) + "\n")
@@ -387,10 +389,10 @@ def infer_ct(manifest: Path, weights: Path, output: Path, device: str = "cpu", *
 
 
 def train_ct(manifest: Path, output: Path, device: str = "cpu", seed: int = 20260714, initial_backbone: Path | None = None,
-             *, auto_masks: bool = False, fast: bool = True) -> None:
+             *, auto_masks: bool = False, resolution: float = 6.0) -> None:
     from .training import assign_folds, run_experiment
     frame = assign_folds(eligible_cohort(validate(read_manifest(manifest, auto_masks=auto_masks,
-        mask_output=output / "lobe_masks", device=device, fast=fast, cache=output / "totalsegmentator"), outcomes=True, dl=False)))
+        mask_output=output / "lobe_masks", device=device, resolution=resolution, cache=output / "totalsegmentator"), outcomes=True, dl=False)))
     volumes = volume_tensor(frame)
     output.mkdir(parents=True, exist_ok=True)
     for fold in FOLDS:

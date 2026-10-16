@@ -1,6 +1,7 @@
 """Run after download-demo-ct and infer-ct; this exercises real public voxels."""
 
 import os
+import json
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +17,7 @@ def test_real_public_ct_features_are_measured_from_the_images():
     from nsclc_toxicity.public_ct import CT_SHA256
     from nsclc_toxicity.schema import Q_FEATURES, FOLDS, dl_columns
     assert sha256(Path("data/public_ct/CT-chest.nrrd")) == CT_SHA256
+    assert json.loads(Path("results/public_ct/run.json").read_text())["segmentation"]["resolution_mm"] == 6
     prepared = pd.read_csv("results/public_ct/prepared.csv")
     assert len(prepared) == 1
     assert prepared[list(Q_FEATURES)].notna().all().all()
