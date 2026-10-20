@@ -1,5 +1,7 @@
 import io
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -33,6 +35,21 @@ def test_primary_notebook_computes_real_images():
     assert "prepare_ct(" in source and "auto_masks=True" in source
     assert "data/sample.csv" not in source
     assert "make_sample" not in source
+
+
+def test_notebook_missing_dependencies_explain_how_to_select_the_ct_kernel():
+    notebook = json.loads(Path("notebooks/quickstart.ipynb").read_text())
+    assert notebook["metadata"]["kernelspec"]["name"] == "nsclc_toxicity"
+    source = "".join(next(c for c in notebook["cells"] if c["cell_type"] == "code")["source"])
+    # Disable site-packages to reproduce opening this notebook in an unprepared
+    # Python environment. Startup must give repair instructions before torch imports.
+    result = subprocess.run([sys.executable, "-S", "-c", source], text=True, capture_output=True)
+    assert result.returncode != 0
+    assert "ModuleNotFoundError" not in result.stderr
+    assert "NSCLC Toxicity (CT)" in result.stderr
+    assert "conda env update -f environment.yml" in result.stderr
+    assert "restart the kernel" in result.stderr
+    assert "Python:" in result.stdout
 
 
 def test_download_rejects_corruption_and_preserves_existing_file(tmp_path, monkeypatch):

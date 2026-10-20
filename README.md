@@ -28,10 +28,13 @@ Open `results/public_ct/predictions.csv` in Excel. **`Multimodal` is the final m
 ## Notebook
 
 ```bash
-jupyter lab notebooks/quickstart.ipynb
+python -m ipykernel install --sys-prefix --name nsclc_toxicity --display-name "NSCLC Toxicity (CT)"
+python -m jupyter lab notebooks/quickstart.ipynb
 ```
 
-Select the `nsclc_toxicity` Python environment and choose **Run → Run All Cells**. The notebook runs the image workflow, displays the measured features and CT network outputs, and overlays the computed lobe masks on the scan.
+Select **NSCLC Toxicity (CT)** in the notebook's kernel picker, then choose **Run → Run All Cells**. In VS Code, use **Select Kernel → Python Environments → nsclc_toxicity**. The first cell prints the Python path and checks the CT dependencies before processing images.
+
+If you see `No module named 'torch'`, update the environment with `conda env update -f environment.yml`, activate `nsclc_toxicity`, and run the two commands above again. Restart the notebook kernel after switching environments or installing packages. The notebook measures CT features, runs the networks, and overlays computed lobe masks on the scan.
 
 ## Your own CT and clinical data
 

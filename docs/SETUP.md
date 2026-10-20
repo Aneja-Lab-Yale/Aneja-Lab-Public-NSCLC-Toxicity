@@ -2,7 +2,7 @@
 
 Run commands from the repository folder, with `nsclc_toxicity` activated.
 
-**Without Conda:** use Python 3.9–3.12 (3.11 recommended):
+**Without Conda:** for the real-CT notebook, use Python 3.10–3.12 (3.11 recommended):
 
 ```bash
 python -m venv .venv
@@ -11,16 +11,26 @@ python -m venv .venv
 Activate with `source .venv/bin/activate` on macOS/Linux, or `.venv\Scripts\activate` in Windows Command Prompt. Then:
 
 ```bash
-python -m pip install -e ".[notebook]"
-python -m nsclc_toxicity download-weights
-python -m nsclc_toxicity predict --input data/sample.csv
+python -m pip install --upgrade pip
+python -m pip install -e ".[notebook,imaging,segmentation]"
+python -m ipykernel install --sys-prefix --name nsclc_toxicity --display-name "NSCLC Toxicity (CT)"
+python -m jupyter lab notebooks/quickstart.ipynb
 ```
 
-**Notebook kernel:** select the Python environment where you installed this package. If it is missing:
+**Notebook kernel:** select **NSCLC Toxicity (CT)**. In VS Code, select **Python Environments → nsclc_toxicity** (or your `.venv`). An open notebook keeps using its previous Python until you switch/restart the kernel. Installing packages in another terminal environment does not add them to the running kernel.
+
+**`No module named 'torch'`:** the selected kernel is missing the CT installation. For the Conda environment, run these commands from the repository folder:
 
 ```bash
-python -m ipykernel install --user --name nsclc_toxicity --display-name "NSCLC Toxicity"
+conda env update -f environment.yml
+conda activate nsclc_toxicity
+python -m ipykernel install --sys-prefix --name nsclc_toxicity --display-name "NSCLC Toxicity (CT)"
+python -c "import sys, torch; print(sys.executable); print(torch.__version__)"
 ```
+
+Then switch to **NSCLC Toxicity (CT)** and restart the notebook kernel. The first cell prints the selected Python and reports missing dependencies with repair instructions.
+
+**CSV-only installation:** `python -m pip install -e ".[notebook]"` is sufficient for `notebooks/csv_demo.ipynb` and the synthetic tabular sample. It does not install PyTorch or raw CT processing. The CSV-only command-line workflow also supports Python 3.9.
 
 **Weights not found:** run `download-weights` from the repository folder. Or provide a custom file with `predict --weights /path/to/final_model.json`.
 
